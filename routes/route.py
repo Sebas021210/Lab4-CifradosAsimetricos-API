@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from models.model import User
 from config.database import collection_name
+from security.cifrados import password_sha256
 from bson import ObjectId
 
 router = APIRouter()
@@ -8,7 +9,11 @@ router = APIRouter()
 # POST - Create a new user
 @router.post("/register")
 async def create_user(user: User):
-    collection_name.insert_one(dict(user))
+    hashed_password = password_sha256(user.password)
+    user_dict = dict(user)
+    user_dict["password"] = hashed_password
+
+    collection_name.insert_one(user_dict)
     return {"message": "User created successfully"}
 
 # DELETE - Delete a user by ID

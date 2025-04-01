@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from models.model import User
 from config.database import collection_name
-from security.cifrados import password_sha256
+from security.cifrados import password_sha256, password_verify, create_jwt_token, verify_jwt_token
 from bson import ObjectId
 
 router = APIRouter()
@@ -15,6 +15,19 @@ async def create_user(user: User):
 
     collection_name.insert_one(user_dict)
     return {"message": "User created successfully"}
+
+# POST - Login user
+@router.post("/login")
+async def login_user(email: str, password: str):
+    user = collection_name.find_one({"email": email})
+    if user and password_verify(password, user["password"]):
+        token = create_jwt_token(str(user["_id"]))
+        return {"message": "Login successful", "token": token}
+    else:
+        if user is None:
+            return {"message": "User not found"}
+        else:
+            return {"message": "Invalid password"}
 
 # DELETE - Delete a user by ID
 @router.delete("/delete/{user_id}")

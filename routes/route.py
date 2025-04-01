@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from models.cifrados import User
+from models.model import User
 from config.database import collection_name
 from bson import ObjectId
 

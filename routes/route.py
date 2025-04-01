@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from models.model import User
 from config.database import collection_name
-from security.cifrados import password_sha256, password_verify, create_jwt_token, verify_jwt_token
+from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user
 from bson import ObjectId
 
 router = APIRouter()
@@ -37,3 +37,8 @@ async def delete_user(user_id: str):
         return {"message": "User deleted successfully"}
     else:
         return {"message": "User not found"}
+
+# GET - Get token information
+@router.get("/protected")
+async def protected_route(user_id: str = Depends(get_current_user)):
+    return {"message": "You have access!", "user_id": user_id}

@@ -1,3 +1,4 @@
+from fastapi import Header, HTTPException
 import hashlib 
 import jwt 
 import datetime
@@ -42,3 +43,18 @@ def verify_jwt_token(token: str) -> dict:
         return {"error": "Token has expired"}
     except jwt.InvalidTokenError:
         return {"error": "Invalid token"}
+
+def get_current_user(authorization: str = Header(None)):
+    """
+    Middleware para verificar el JWT en las peticiones protegidas.
+    """
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Missing token")
+
+    token = authorization.split("Bearer ")[-1]
+    payload = verify_jwt_token(token)
+
+    if "error" in payload:
+        raise HTTPException(status_code=401, detail=payload["error"])
+    
+    return payload["user_id"]

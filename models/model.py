@@ -11,3 +11,7 @@ class User(BaseModel):
     files: Optional[List[str]] = []
     files_hash: Optional[List[str]] = []
     files_firma: Optional[List[str]] = []
+
+class Login(BaseModel):
+    email: str
+    password: str

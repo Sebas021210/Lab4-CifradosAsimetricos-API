@@ -1,6 +1,8 @@
 from fastapi import Header, HTTPException
 import hashlib 
 import jwt 
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 import datetime
 import os
 from dotenv import load_dotenv
@@ -58,3 +60,26 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail=payload["error"])
     
     return payload["user_id"]
+
+def generate_key_pair():
+    """
+    Función para genera un par de llaves RSA (privada y pública).
+    """
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    public_key = private_key.public_key()
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return private_pem.decode(), public_pem.decode()

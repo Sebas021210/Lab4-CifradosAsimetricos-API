@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from models.model import User, Login
 from config.database import collection_name
-from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user
+from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair
 from bson import ObjectId
 
 router = APIRouter()
@@ -28,6 +28,18 @@ async def login_user(login: Login):
             return {"message": "User not found"}
         else:
             return {"message": "Invalid password"}
+
+# POST - Keys generation
+@router.post("/keys")
+async def generate_keys(user_id: str = Depends(get_current_user)):
+    user = collection_name.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return {"message": "User not found"}
+
+    private_key, public_key = generate_key_pair()
+
+    collection_name.update_one({"_id": ObjectId(user_id)}, {"$set": {"public_key": public_key}})
+    return {"message": "Keys generated successfully", "private_key": private_key, "public_key": public_key}
 
 # GET - Get token information
 @router.get("/protected")

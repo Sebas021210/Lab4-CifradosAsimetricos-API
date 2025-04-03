@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from models.model import User, Login
 from config.database import collection_name
 from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair
 from bson import ObjectId
+import os
 
 router = APIRouter()
+
+# Path Fileserver
+FILE_SERVER_PATH = "fileserver"
 
 # POST - Create a new user
 @router.post("/register")
@@ -40,6 +44,21 @@ async def generate_keys(user_id: str = Depends(get_current_user)):
 
     collection_name.update_one({"_id": ObjectId(user_id)}, {"$set": {"public_key": public_key}})
     return {"message": "Keys generated successfully", "private_key": private_key, "public_key": public_key}
+
+# POST - Upload file
+@router.post("/upload")
+async def upload_file(file: UploadFile = File(...), user_id: str = Depends(get_current_user)):
+    user_folder = os.path.join(FILE_SERVER_PATH, str(user_id))
+    os.makedirs(user_folder, exist_ok=True)
+
+    file_path = os.path.join(user_folder, file.filename)
+
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+
+    relative_path = f"{user_id}/{file.filename}"
+    collection_name.update_many({}, {"$push": {"files": relative_path}})
+    return {"message": "File uploaded successfully", "file_path": relative_path}
 
 # GET - Get token information
 @router.get("/protected")

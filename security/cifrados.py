@@ -1,7 +1,7 @@
 from fastapi import Header, HTTPException
 import hashlib 
 import jwt 
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.primitives import serialization
 import datetime
 import os
@@ -73,6 +73,26 @@ def generate_key_pair():
     private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    public_key = private_key.public_key()
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return private_pem.decode(), public_pem.decode()
+
+def generate_ecc_key_pair():
+    """
+    Genera un par de llaves ECC (privada y pública) usando la curva SECP256R1.
+    """
+    private_key = ec.generate_private_key(ec.SECP256R1())
+
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption()
     )
 

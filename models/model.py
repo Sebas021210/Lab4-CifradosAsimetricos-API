@@ -7,7 +7,8 @@ class User(BaseModel):
     username: str
     email: str
     password: str
-    public_key: Optional[str] = None
+    rsa_public_key: Optional[str] = None
+    ecc_public_key: Optional[str] = None
     files: Optional[List[str]] = []
     files_hash: Optional[List[str]] = []
     files_firma: Optional[List[str]] = []

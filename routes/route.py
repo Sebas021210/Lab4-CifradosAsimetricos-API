@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, UploadFile
 from models.model import User, Login
 from config.database import collection_name
-from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair
+from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair, generate_ecc_key_pair
 from bson import ObjectId
 import os
 
@@ -44,10 +44,20 @@ async def generate_keys(user_id: str = Depends(get_current_user)):
     if not user:
         return {"message": "User not found"}
 
-    private_key, public_key = generate_key_pair()
+    rsa_private_key, rsa_public_key = generate_key_pair()
+    ecc_private_key, ecc_public_key = generate_ecc_key_pair()
 
-    collection_name.update_one({"_id": ObjectId(user_id)}, {"$set": {"public_key": public_key}})
-    return {"message": "Keys generated successfully", "private_key": private_key, "public_key": public_key}
+    collection_name.update_one({"_id": ObjectId(user_id)}, {"$set": {
+        "rsa_public_key": rsa_public_key,
+        "ecc_public_key": ecc_public_key
+    }})
+    return {
+        "message": "Keys generated successfully",
+        "rsa_public_key": rsa_public_key,
+        "rsa_private_key": rsa_private_key,
+        "ecc_public_key": ecc_public_key,
+        "ecc_private_key": ecc_private_key
+    }
 
 # POST - Upload file
 @router.post("/upload")

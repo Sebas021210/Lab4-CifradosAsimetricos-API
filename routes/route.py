@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, UploadFile, Depends, File
+from fastapi.responses import StreamingResponse
 from models.model import User, Login
 from config.database import collection_name
 from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair, generate_ecc_key_pair
 from bson import ObjectId
 import os
+import zipfile
+import io
 
 router = APIRouter()
 
@@ -47,17 +50,44 @@ async def generate_keys(user_id: str = Depends(get_current_user)):
     rsa_private_key, rsa_public_key = generate_key_pair()
     ecc_private_key, ecc_public_key = generate_ecc_key_pair()
 
+    os.makedirs("private_keys", exist_ok=True)
+    with open(f"private_keys/{user_id}_rsa_private.pem", "w") as f:
+        f.write(rsa_private_key)
+    with open(f"private_keys/{user_id}_ecc_private.pem", "w") as f:
+        f.write(ecc_private_key)
+
     collection_name.update_one({"_id": ObjectId(user_id)}, {"$set": {
         "rsa_public_key": rsa_public_key,
         "ecc_public_key": ecc_public_key
     }})
+
     return {
         "message": "Keys generated successfully",
         "rsa_public_key": rsa_public_key,
-        "rsa_private_key": rsa_private_key,
         "ecc_public_key": ecc_public_key,
-        "ecc_private_key": ecc_private_key
     }
+
+# GET - Download file
+@router.get("/download-private-keys")
+async def download_private_keys(user_id: str = Depends(get_current_user)):
+    rsa_path = f"private_keys/{user_id}_rsa_private.pem"
+    ecc_path = f"private_keys/{user_id}_ecc_private.pem"
+
+    if not os.path.exists(rsa_path) or not os.path.exists(ecc_path):
+        return {"message": "Private keys not found"}
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(rsa_path, arcname=f"{user_id}_rsa_private.pem")
+        zipf.write(ecc_path, arcname=f"{user_id}_ecc_private.pem")
+
+    zip_buffer.seek(0)
+
+    return StreamingResponse(
+    zip_buffer,
+    media_type="application/zip",
+    headers={"Content-Disposition": "attachment; filename=private_keys.zip"}
+    )
 
 # POST - Upload file
 @router.post("/upload")

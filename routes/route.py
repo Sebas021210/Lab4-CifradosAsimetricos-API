@@ -44,6 +44,33 @@ async def login_user(login: Login):
             return {"message": "User not found"}
         else:
             return {"message": "Invalid password"}
+        
+# GET - Get all files
+@router.get("/files")
+async def get_all_files():
+    all_files_data = collection_name.find_one({}, {"files": 1, "_id": 0})
+
+    if not all_files_data or "files" not in all_files_data:
+        return {"message": "No files found", "files": []}
+
+    files = all_files_data.get("files", [])
+
+    files_username = []
+    for file in files:
+        parts = file.split('/', 1)
+        user_id, filename_part = parts
+        user_data = collection_name.find_one({"_id": ObjectId(user_id)}, {"username": 1})
+        
+        if user_data and "username" in user_data:
+            username = user_data["username"]
+            filename = f"{username}/{filename_part}"
+            files_username.append({"filename": filename})
+        else:
+            files_username.append({"filename": file})
+
+    return {
+        "files": files_username
+    }
 
 # POST - Keys generation
 @router.post("/keys")
@@ -106,7 +133,7 @@ async def upload_file(file: UploadFile = File(...), user_id: str = Depends(get_c
         f.write(await file.read())
 
     relative_path = f"{user_id}/{file.filename}"
-    collection_name.update_many({}, {"$push": {"files": relative_path}})
+    collection_name.update_many({}, {"$push": {"files": relative_path, "files_hash": None, "files_firma": None}})
     return {"message": "File uploaded successfully", "file_path": relative_path}
 
 # POST - Upload sign file

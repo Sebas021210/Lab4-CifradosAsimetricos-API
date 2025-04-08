@@ -18,12 +18,16 @@ FILE_SERVER_PATH = "fileserver"
 @router.post("/register")
 async def create_user(user: User):
     hashed_password = password_sha256(user.password)
-    all_files = collection_name.find_one({}, {"files": 1})
+    all_files = collection_name.find_one({}, {"files": 1, "files_hash": 1, "files_firma": 1})
     existing_files = all_files["files"] if all_files else []
+    existing_files_hash = all_files["files_hash"] if all_files else []
+    existing_files_firma = all_files["files_firma"] if all_files else []
 
     user_dict = dict(user)
     user_dict["password"] = hashed_password 
     user_dict["files"] = existing_files
+    user_dict["files_hash"] = existing_files_hash
+    user_dict["files_firma"] = existing_files_firma
 
     collection_name.insert_one(user_dict)
     return {"message": "User created successfully"}

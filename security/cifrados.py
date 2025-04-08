@@ -1,8 +1,9 @@
 from fastapi import Header, HTTPException
 import hashlib 
 import jwt 
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
 import datetime
 import os
 from dotenv import load_dotenv
@@ -103,3 +104,28 @@ def generate_ecc_key_pair():
     )
 
     return private_pem.decode(), public_pem.decode()
+
+def calculate_hash(file_bytes: bytes) -> str:
+    """
+    Función que calcula el hash SHA-256 de un archivo dado en bytes.
+    """
+    return hashlib.sha256(file_bytes).hexdigest()
+
+def sign_rsa(private_key: rsa.RSAPrivateKey, data: bytes) -> bytes:
+    """
+    Función que firma datos usando una llave privada RSA.
+    """
+    return private_key.sign(
+        data,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+
+def sign_ecc(private_key: ec.EllipticCurvePrivateKey, data: bytes) -> bytes:
+    """
+    Función que firma datos usando una llave privada ECC.
+    """
+    return private_key.sign(data, ec.ECDSA(hashes.SHA256()))

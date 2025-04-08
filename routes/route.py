@@ -1,8 +1,9 @@
 from fastapi import APIRouter, UploadFile, Depends, File
 from fastapi.responses import StreamingResponse
+from cryptography.hazmat.primitives import serialization
 from models.model import User, Login
 from config.database import collection_name
-from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair, generate_ecc_key_pair
+from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair, generate_ecc_key_pair, calculate_hash, sign_rsa, sign_ecc
 from bson import ObjectId
 import os
 import zipfile
@@ -103,6 +104,54 @@ async def upload_file(file: UploadFile = File(...), user_id: str = Depends(get_c
     relative_path = f"{user_id}/{file.filename}"
     collection_name.update_many({}, {"$push": {"files": relative_path}})
     return {"message": "File uploaded successfully", "file_path": relative_path}
+
+# POST - Upload sign file
+@router.post("/upload/{method}")
+async def upload_sign_file(
+    method: str,
+    file: UploadFile = File(...),
+    private_key_pem: UploadFile = File(...),
+    user_id: str = Depends(get_current_user)
+):
+    if method not in ["rsa", "ecc"]:
+        return {"message": "Invalid method. Use 'rsa' or 'ecc'."}
+    
+    file_bytes = await file.read()
+    file_hash = calculate_hash(file_bytes)
+
+    private_key_bytes = await private_key_pem.read()
+
+    if method == "rsa":
+        private_key = serialization.load_pem_private_key(private_key_bytes, password=None)
+        signature = sign_rsa(private_key, file_bytes)
+    else:
+        private_key = serialization.load_pem_private_key(private_key_bytes, password=None)
+        signature = sign_ecc(private_key, file_bytes)
+
+    user_folder = os.path.join(FILE_SERVER_PATH, str(user_id))
+    os.makedirs(user_folder, exist_ok=True)
+    file_path = os.path.join(user_folder, file.filename)
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+
+    relative_path = f"{user_id}/{file.filename}"
+    signature_hex = signature.hex()
+
+    collection_name.update_many({}, {
+        "$push": {
+            "files": relative_path,
+            "files_hash": file_hash,
+            "files_firma": signature_hex
+        }
+    })
+
+    return {
+        "message": "File and signature uploaded successfully",
+        "file_path": relative_path,
+        "hash": file_hash,
+        "signature": signature_hex,
+        "method": method
+    }
 
 # GET - Get token information
 @router.get("/protected")

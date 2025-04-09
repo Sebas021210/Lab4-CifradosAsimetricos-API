@@ -129,3 +129,26 @@ def sign_ecc(private_key: ec.EllipticCurvePrivateKey, data: bytes) -> bytes:
     Función que firma datos usando una llave privada ECC.
     """
     return private_key.sign(data, ec.ECDSA(hashes.SHA256()))
+
+
+def verify_signature_rsa(public_key, data: bytes, signature: bytes) -> bool:
+    try:
+        public_key.verify(
+            signature,
+            data,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True
+    except Exception:
+        return False
+
+def verify_signature_ecc(public_key, data: bytes, signature: bytes) -> bool:
+    try:
+        public_key.verify(signature, data, ec.ECDSA(hashes.SHA256()))
+        return True
+    except Exception:
+        return False

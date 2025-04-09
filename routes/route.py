@@ -1,9 +1,9 @@
-from fastapi import APIRouter, UploadFile, Depends, File
+from fastapi import APIRouter, UploadFile, Depends, File, Form
 from fastapi.responses import StreamingResponse
 from cryptography.hazmat.primitives import serialization
 from models.model import User, Login
 from config.database import collection_name
-from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair, generate_ecc_key_pair, calculate_hash, sign_rsa, sign_ecc
+from security.cifrados import password_sha256, password_verify, create_jwt_token, get_current_user, generate_key_pair, generate_ecc_key_pair, calculate_hash, sign_rsa, sign_ecc, verify_signature_ecc, verify_signature_rsa
 from bson import ObjectId
 import os
 import zipfile
@@ -197,3 +197,55 @@ async def delete_user(user_id: str):
         return {"message": "User deleted successfully"}
     else:
         return {"message": "User not found"}
+
+# Post - Verificar
+@router.post("/verify-signature")
+async def verify_signature(
+    file: UploadFile = File(...),
+    public_key_pem: UploadFile = File(...),
+    method: str = Form(...)
+):
+    if method not in ["rsa", "ecc"]:
+        return {"message": "Invalid method. Use 'rsa' or 'ecc'."}
+
+    file_bytes = await file.read()
+    public_key_bytes = await public_key_pem.read()
+
+    # Cargar la llave pública
+    try:
+        public_key = serialization.load_pem_public_key(public_key_bytes)
+    except Exception as e:
+        return {"message": "Invalid public key", "error": str(e)}
+
+    # Buscar en todos los usuarios
+    all_users = collection_name.find({}, {"files": 1, "files_firma": 1})
+    for user in all_users:
+        files = user.get("files", [])
+        firmas = user.get("files_firma", [])
+
+        for idx, firma_hex in enumerate(firmas):
+            if not firma_hex:
+                continue
+
+            try:
+                firma = bytes.fromhex(firma_hex)
+            except ValueError:
+                continue
+
+            if method == "rsa":
+                valid = verify_signature_rsa(public_key, file_bytes, firma)
+            else:
+                valid = verify_signature_ecc(public_key, file_bytes, firma)
+
+            if valid:
+                matched_file = files[idx] if idx < len(files) else None
+                return {
+                    "match": True,
+                    "file": matched_file,
+                    "index": idx
+                }
+
+    return {
+        "match": False,
+        "message": "No matching signature found for this file and public key."
+    }

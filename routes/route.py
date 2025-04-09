@@ -233,7 +233,8 @@ async def upload_sign_file(
 async def verify_signature(
     file: UploadFile = File(...),
     public_key_pem: UploadFile = File(...),
-    method: str = Form(...)
+    method: str = Form(...),
+    user_id: str = Depends(get_current_user)
 ):
 
     if method not in ["rsa", "ecc"]:
@@ -268,9 +269,19 @@ async def verify_signature(
 
             if valid:
                 matched_file = files[idx] if idx < len(files) else None
+                parts = matched_file.split('/', 1)
+                user_id, filename_part = parts
+                user_data = collection_name.find_one({"_id": ObjectId(user_id)}, {"username": 1})
+                
+                if user_data and "username" in user_data:
+                    username = user_data["username"]
+                else:
+                    username = "Unknown"
+
                 return {
                     "match": True,
                     "file": matched_file,
+                    "username": username,
                     "index": idx
                 }
 

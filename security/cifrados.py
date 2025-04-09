@@ -130,7 +130,6 @@ def sign_ecc(private_key: ec.EllipticCurvePrivateKey, data: bytes) -> bytes:
     """
     return private_key.sign(data, ec.ECDSA(hashes.SHA256()))
 
-
 def verify_signature_rsa(public_key, data: bytes, signature: bytes) -> bool:
     try:
         public_key.verify(

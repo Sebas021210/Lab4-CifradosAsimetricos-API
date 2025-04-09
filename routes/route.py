@@ -121,6 +121,50 @@ async def download_private_keys(user_id: str = Depends(get_current_user)):
     headers={"Content-Disposition": "attachment; filename=private_keys.zip"}
     )
 
+# GET - Download file and public key
+@router.get("/download/{username}/{filename}")
+async def download_file(username: str, filename: str, user_id: str = Depends(get_current_user)):
+    user = collection_name.find_one({"username": username})
+    if not user:
+        return {"message": "User not found"}
+    
+    user_id = str(user["_id"])
+    original_filename = f"{user_id}/{filename}"
+    
+    if original_filename not in user.get("files", []):
+        return {"message": "File not found"}
+    
+    file_path = os.path.join(FILE_SERVER_PATH, original_filename)
+    
+    if not os.path.isfile(file_path):
+        return {"message": "File not found"}
+    
+    rsa_public_key = user.get("rsa_public_key", "")
+    ecc_public_key = user.get("ecc_public_key", "")
+    
+    if not rsa_public_key or not ecc_public_key:
+        return {"message": "Public keys not found"}
+    
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(file_path, arcname=filename)
+
+        if rsa_public_key:
+            zipf.writestr(f"{username}_rsa_public.pem", rsa_public_key)
+        
+        if ecc_public_key:
+            zipf.writestr(f"{username}_ecc_public.pem", ecc_public_key)
+    
+    zip_buffer.seek(0)
+    zip_filename = f"{filename}_public_keys.zip"
+    
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+    )
+
 # POST - Upload file
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), user_id: str = Depends(get_current_user)):
@@ -184,40 +228,25 @@ async def upload_sign_file(
         "method": method
     }
 
-# GET - Get token information
-@router.get("/protected")
-async def protected_route(user_id: str = Depends(get_current_user)):
-    return {"message": "You have access!", "user_id": user_id}
-
-# DELETE - Delete a user by ID
-@router.delete("/delete/{user_id}")
-async def delete_user(user_id: str):
-    result = collection_name.delete_one({"_id": ObjectId(user_id)})
-    if result.deleted_count == 1:
-        return {"message": "User deleted successfully"}
-    else:
-        return {"message": "User not found"}
-
-# Post - Verificar
+# POST - Verify signature
 @router.post("/verify-signature")
 async def verify_signature(
     file: UploadFile = File(...),
     public_key_pem: UploadFile = File(...),
     method: str = Form(...)
 ):
+
     if method not in ["rsa", "ecc"]:
         return {"message": "Invalid method. Use 'rsa' or 'ecc'."}
 
     file_bytes = await file.read()
     public_key_bytes = await public_key_pem.read()
 
-    # Cargar la llave pública
     try:
         public_key = serialization.load_pem_public_key(public_key_bytes)
     except Exception as e:
         return {"message": "Invalid public key", "error": str(e)}
 
-    # Buscar en todos los usuarios
     all_users = collection_name.find({}, {"files": 1, "files_firma": 1})
     for user in all_users:
         files = user.get("files", [])
@@ -249,3 +278,17 @@ async def verify_signature(
         "match": False,
         "message": "No matching signature found for this file and public key."
     }
+
+# GET - Get token information
+@router.get("/protected")
+async def protected_route(user_id: str = Depends(get_current_user)):
+    return {"message": "You have access!", "user_id": user_id}
+
+# DELETE - Delete a user by ID
+@router.delete("/delete/{user_id}")
+async def delete_user(user_id: str):
+    result = collection_name.delete_one({"_id": ObjectId(user_id)})
+    if result.deleted_count == 1:
+        return {"message": "User deleted successfully"}
+    else:
+        return {"message": "User not found"}

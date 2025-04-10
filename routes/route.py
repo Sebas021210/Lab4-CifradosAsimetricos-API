@@ -147,23 +147,26 @@ async def download_file(username: str, filename: str, user_id: str = Depends(get
     
     zip_buffer = io.BytesIO()
     
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(file_path, arcname=filename)
+    try:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(file_path, arcname=filename)
 
-        if rsa_public_key:
-            zipf.writestr(f"{username}_rsa_public.pem", rsa_public_key)
-        
-        if ecc_public_key:
-            zipf.writestr(f"{username}_ecc_public.pem", ecc_public_key)
+            if rsa_public_key:
+                zipf.writestr(f"{username}_rsa_public.pem", rsa_public_key)
+            
+            if ecc_public_key:
+                zipf.writestr(f"{username}_ecc_public.pem", ecc_public_key)
     
-    zip_buffer.seek(0)
-    zip_filename = f"{filename}_public_keys.zip"
+        zip_buffer.seek(0)
+        zip_filename = f"{filename}_public_keys.zip"
     
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
-    )
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+        )
+    except Exception as e:
+        return {"message": f"Error generating ZIP: {str(e)}"}
 
 # POST - Upload file
 @router.post("/upload")

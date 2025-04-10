@@ -38,7 +38,7 @@ async def login_user(login: Login):
     user = collection_name.find_one({"email": login.email})
     if user and password_verify(login.password, user["password"]):
         token = create_jwt_token(str(user["_id"]))
-        return {"message": "Login successful", "token": token}
+        return {"message": "Login successful", "token": token, "username": user["username"]}
     else:
         if user is None:
             return {"message": "User not found"}
